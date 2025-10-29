@@ -1,7 +1,11 @@
-import { withClerkMiddleware } from "@clerk/nextjs";
+import { authMiddleware } from "@clerk/nextjs";
 
-export default withClerkMiddleware(() => {
-  // Add any custom middleware logic here
+export default authMiddleware({
+  // Routes that can be accessed while signed out
+  publicRoutes: ["/"],
+  // Routes that can always be accessed, and have
+  // no authentication information
+  ignoredRoutes: ["/no-auth-in-this-route"],
 });
 
 export const config = {

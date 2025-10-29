@@ -1,27 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Film, Download, ExternalLink, Loader2 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
+import { useUser } from '@clerk/nextjs'
 import type { FilmProject } from '@/lib/workflow/engine'
 
 export function FilmGallery() {
+  const { user } = useUser()
   const [projects, setProjects] = useState<FilmProject[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchProjects()
-  }, [])
+  const fetchProjects = useCallback(async () => {
+    if (!user?.id) return
 
-  const fetchProjects = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('projects')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -35,7 +36,13 @@ export function FilmGallery() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchProjects()
+    }
+  }, [user?.id, fetchProjects])
 
   const getStatusColor = (status: FilmProject['status']) => {
     switch (status) {

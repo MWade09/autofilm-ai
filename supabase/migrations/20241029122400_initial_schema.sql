@@ -1,6 +1,11 @@
 -- Enable RLS
 ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
+-- Drop tables if they exist
+DROP TABLE IF EXISTS user_credits CASCADE;
+DROP TABLE IF EXISTS projects CASCADE;
+DROP FUNCTION IF EXISTS public.get_clerk_uid() CASCADE;
+
 -- Create projects table
 CREATE TABLE projects (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -23,26 +28,48 @@ CREATE TABLE user_credits (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- Create Clerk user ID function in public schema
+CREATE OR REPLACE FUNCTION public.get_clerk_uid()
+RETURNS TEXT
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $$
+DECLARE
+  user_id TEXT;
+BEGIN
+  -- Extract user ID from JWT claims
+  user_id := (current_setting('request.jwt.claims', true)::json)->>'sub';
+  RETURN COALESCE(user_id, '');
+END;
+$$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION public.get_clerk_uid() TO authenticated;
+
 -- Enable RLS
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_credits ENABLE ROW LEVEL SECURITY;
 
--- Create policies for projects
+-- Create policies for projects using Clerk user ID
 CREATE POLICY "Users can view their own projects" ON projects
-  FOR SELECT USING (auth.uid()::text = user_id);
+  FOR SELECT USING (public.get_clerk_uid() = user_id);
 
 CREATE POLICY "Users can create their own projects" ON projects
-  FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+  FOR INSERT WITH CHECK (public.get_clerk_uid() = user_id);
 
 CREATE POLICY "Users can update their own projects" ON projects
-  FOR UPDATE USING (auth.uid()::text = user_id);
+  FOR UPDATE USING (public.get_clerk_uid() = user_id);
 
--- Create policies for user_credits
+-- Create policies for user_credits using Clerk user ID
 CREATE POLICY "Users can view their own credits" ON user_credits
-  FOR SELECT USING (auth.uid()::text = user_id);
+  FOR SELECT USING (public.get_clerk_uid() = user_id);
 
 CREATE POLICY "Users can update their own credits" ON user_credits
-  FOR UPDATE USING (auth.uid()::text = user_id);
+  FOR UPDATE USING (public.get_clerk_uid() = user_id);
+
+CREATE POLICY "Users can insert their own credits" ON user_credits
+  FOR INSERT WITH CHECK (public.get_clerk_uid() = user_id);
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

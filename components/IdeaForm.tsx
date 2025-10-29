@@ -34,8 +34,22 @@ export function IdeaForm() {
       } else {
         alert(`Error: ${data.error}`)
       }
-    } catch {
-      alert('Failed to start film generation. Please try again.')
+    } catch (error) {
+      console.error('Film generation error:', error)
+
+      let errorMessage = 'Failed to start film generation. Please try again.'
+
+      if (error instanceof Error) {
+        if (error.message.includes('Insufficient credits')) {
+          errorMessage = 'You don\'t have enough credits to generate a film. Please upgrade your account.'
+        } else if (error.message.includes('Unauthorized')) {
+          errorMessage = 'Please sign in to generate films.'
+        } else {
+          errorMessage = error.message
+        }
+      }
+
+      alert(errorMessage)
     } finally {
       setIsGenerating(false)
     }
