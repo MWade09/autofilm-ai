@@ -28,7 +28,7 @@ Below is a **complete, collaborative implementation plan** designed for **you an
 | 1.3 Initialize monorepo structure | **Me** | I’ll generate full folder structure + `package.json` |
 | 1.4 Choose stack | **Both** | **Frontend**: Next.js 14 (App Router) + Tailwind + ShadCN UI<br>**Backend**: Node.js + Express (or Next.js API routes)<br>**Auth**: Clerk<br>**DB**: Supabase (PostgreSQL + Storage)<br>**Workflow**: n8n (self-hosted or cloud)<br>**APIs**: Pika, Json2Video, OpenAI |
 | 1.5 Generate `.env.example` | **Me** | All required keys (I’ll list them) |
-| 1.6 Deploy n8n locally (Docker) | **Me** | I’ll write `docker-compose.yml` and n8n workflow JSON |
+| ~~1.6 Deploy n8n locally (Docker) | **Me** | I’ll write `docker-compose.yml` and n8n workflow JSON~~ | --> We will create our own workflow engine in the app.
 
 ---
 
