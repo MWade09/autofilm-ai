@@ -166,7 +166,7 @@ Guidelines:
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.json2VideoApiKey}`,
+          'X-API-Key': this.json2VideoApiKey,
         },
         body: JSON.stringify(json2VideoSpec),
       })
@@ -197,7 +197,7 @@ Guidelines:
       try {
         const response = await fetch(`${this.json2VideoUrl}/v2/projects/${renderId}`, {
           headers: {
-            'Authorization': `Bearer ${this.json2VideoApiKey}`,
+            'X-API-Key': this.json2VideoApiKey,
           },
         })
 

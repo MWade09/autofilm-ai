@@ -11,7 +11,7 @@ import { useUser } from '@clerk/nextjs'
 import type { FilmProject } from '@/lib/workflow/engine'
 
 export function FilmGallery() {
-  const { user } = useUser()
+  const { user, isLoaded } = useUser()
   const [projects, setProjects] = useState<FilmProject[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -39,10 +39,12 @@ export function FilmGallery() {
   }, [user?.id])
 
   useEffect(() => {
-    if (user?.id) {
+    if (isLoaded && user?.id) {
       fetchProjects()
+    } else if (isLoaded && !user?.id) {
+      setLoading(false)
     }
-  }, [user?.id, fetchProjects])
+  }, [isLoaded, user?.id, fetchProjects])
 
   const getStatusColor = (status: FilmProject['status']) => {
     switch (status) {
@@ -56,6 +58,16 @@ export function FilmGallery() {
       default:
         return 'bg-gray-500'
     }
+  }
+
+  // Don't render until Clerk is loaded to prevent hydration issues
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading...</span>
+      </div>
+    )
   }
 
   if (loading) {

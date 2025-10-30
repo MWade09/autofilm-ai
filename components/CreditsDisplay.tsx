@@ -7,12 +7,15 @@ import { CreditCard, AlertTriangle } from 'lucide-react'
 
 
 export function CreditsDisplay() {
-  const { user } = useUser()
+  const { user, isLoaded } = useUser()
   const [credits, setCredits] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchCredits = useCallback(async () => {
-    if (!user?.id) return
+    if (!user?.id) {
+      setLoading(false)
+      return
+    }
 
     try {
       const { data, error } = await supabaseAdmin
@@ -21,24 +24,43 @@ export function CreditsDisplay() {
         .eq('user_id', user.id)
         .single()
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-        console.error('Error fetching credits:', error)
-        return
+      if (error) {
+        if (error.code === 'PGRST116') { // Not found - user has no credits record yet
+          setCredits(3) // Default credits
+        } else {
+          console.error('Error fetching credits:', error)
+          setCredits(3) // Fallback to default
+        }
+      } else {
+        setCredits(data?.credits ?? 3)
       }
-
-      setCredits(data?.credits ?? 3) // Default to 3 credits
     } catch (error) {
       console.error('Error fetching credits:', error)
+      setCredits(3) // Fallback to default on any error
     } finally {
       setLoading(false)
     }
   }, [user?.id])
 
   useEffect(() => {
-    if (user?.id) {
+    if (isLoaded && user?.id) {
       fetchCredits()
+    } else if (isLoaded && !user?.id) {
+      setLoading(false)
     }
-  }, [user?.id, fetchCredits])
+  }, [isLoaded, user?.id, fetchCredits])
+
+  // Don't render anything until Clerk is loaded to prevent hydration mismatch
+  if (!isLoaded) {
+    return (
+      <div className="animate-pulse bg-gray-200 dark:bg-gray-700 h-6 w-24 rounded"></div>
+    )
+  }
+
+  // Don't show credits for unauthenticated users
+  if (!user?.id) {
+    return null
+  }
 
   if (loading) {
     return (
