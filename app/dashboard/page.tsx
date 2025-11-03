@@ -1,10 +1,12 @@
 import { IdeaForm } from '@/components/IdeaForm'
 import { FilmGallery } from '@/components/FilmGallery'
+import { PortalBackground } from '@/components/PortalBackground'
 
 export default function Dashboard() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen relative">
+      <PortalBackground />
+      <div className="relative z-10 container mx-auto px-4 py-8">
         {/* Main Content */}
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left Column - Form */}

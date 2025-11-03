@@ -26,24 +26,24 @@ Below is a **complete, collaborative implementation plan** designed for **you an
 |------|-------|-------|
 | 1.1 Create GitHub repo: `autofilm-ai` | **You** | Private repo. Invite me (you’ll paste code I generate). |
 | 1.3 Initialize monorepo structure | **Me** | I’ll generate full folder structure + `package.json` |
-| 1.4 Choose stack | **Both** | **Frontend**: Next.js 14 (App Router) + Tailwind + ShadCN UI<br>**Backend**: Node.js + Express (or Next.js API routes)<br>**Auth**: Clerk<br>**DB**: Supabase (PostgreSQL + Storage)<br>**Workflow**: n8n (self-hosted or cloud)<br>**APIs**: Pika, Json2Video, OpenAI |
+| 1.4 Choose stack | **Both** | **Frontend**: Next.js 14 (App Router) + Tailwind + ShadCN UI<br>**Backend**: Node.js + Express (or Next.js API routes)<br>**Auth**: Clerk<br>**DB**: Supabase (PostgreSQL + Storage)<br>**Workflow**: Custom TypeScript workflow engine<br>**APIs**: Pika, Json2Video, OpenAI |
 | 1.5 Generate `.env.example` | **Me** | All required keys (I’ll list them) |
 | ~~1.6 Deploy n8n locally (Docker) | **Me** | I’ll write `docker-compose.yml` and n8n workflow JSON~~ | --> We will create our own workflow engine in the app.
 
 ---
 
-## PHASE 2: Recreate n8n Workflow in Code (Day 3–5)
+## PHASE 2: Build Custom Workflow Engine (Day 3–5)
 
-> **Goal**: Replace manual n8n with **programmatic workflow engine** inside our app.
+> **Goal**: Create a **custom TypeScript workflow engine** to automate the film generation process programmatically.
 
 | Task | Owner | Details |
 |------|-------|-------|
-| 2.1 Export current n8n workflow as JSON | **You** | In n8n → Export → Copy JSON |
-| 2.2 Paste n8n JSON into `/workflow/n8n-export.json` | **You** | I’ll use it as reference |
-| 2.3 Build **Workflow Engine** (`/lib/workflow/engine.ts`) | **Me** | I’ll code a class that runs steps: <br>→ Get idea from DB<br>→ Call OpenAI for scenes<br>→ Split scenes<br>→ Pika API loop<br>→ Json2Video render<br>→ Upload to Supabase Storage |
-| 2.4 Create **API route**: `POST /api/generate` | **Me** | Triggers workflow. Returns job ID. |
-| 2.5 Add **Webhooks** for Pika & Json2Video status | **Me** | Poll → Webhook → Update DB |
-| 2.6 Replace Google Sheets with **Supabase DB** | **Me** | Table: `projects` (id, idea, status, video_url, error_log, etc.) |
+| 2.1 Design workflow steps and data flow | **Both** | Map out: Idea → Scenes → Video Clips → Final Film |
+| 2.2 Build **Workflow Engine** (`/lib/workflow/engine.ts`) | **Me** | Custom TypeScript class that runs steps: <br>→ Get idea from DB<br>→ Call OpenRouter for scenes<br>→ Split scenes<br>→ Pika API loop<br>→ Json2Video render<br>→ Upload to Supabase Storage |
+| 2.3 Create **API route**: `POST /api/generate` | **Me** | Triggers workflow. Returns job ID. |
+| 2.4 Add **Progress Tracking** for Pika & Json2Video | **Me** | Polling/Webhook → Update DB with real-time status |
+| 2.5 Set up **Supabase Database** | **Me** | Table: `projects` (id, idea, status, video_url, error_log, etc.) |
+| 2.6 Test API integrations | **Both** | OpenRouter, Pika, Json2Video connections |
 
 ---
 
@@ -79,7 +79,7 @@ Below is a **complete, collaborative implementation plan** designed for **you an
 | Task | Owner | Details |
 |------|-------|-------|
 | 5.1 Deploy to **Vercel** (frontend + API) | **Me** | I’ll write `vercel.json` |
-| 5.2 Deploy **n8n** (optional) or remove | **Me** | We’ll run workflow in code — no n8n needed |
+| 5.2 Configure **production environment** | **Me** | Set up production API keys and environment variables |
 | 5.3 Set up **Supabase** project | **You** | Create project → I’ll use connection string |
 | 5.4 Add **Error Logging** (Sentry) | **Me** | Catch failed renders |
 | 5.5 Add **Onboarding Tour** | **Me** | “Enter idea → Click Generate → Watch magic” |
@@ -115,11 +115,12 @@ Below is a **complete, collaborative implementation plan** designed for **you an
 │   └── ai/
 ├── components/
 │   ├── IdeaForm.tsx
-│   ├── ProgressBar.tsx
-│   └── VideoPlayer.tsx
+│   ├── FilmGallery.tsx
+│   ├── CreditsDisplay.tsx
+│   └── ui/ (ShadCN components)
 ├── public/
-├── workflow/n8n-export.json
-├── docker-compose.yml
+├── types/
+├── projectLogs.md
 └── package.json
 ```
 
@@ -142,40 +143,47 @@ Below is a **complete, collaborative implementation plan** designed for **you an
 
 1. [ ] Create GitHub repo + invite collaborator
 2. [ ] Set up VS Code + Live Share
-3. [ ] Export current n8n workflow JSON
-4. [ ] Create Supabase project
-5. [ ] Get API keys: Pika, Json2Video, OpenAI, Stripe (test), Clerk
-6. [ ] Describe UI vision (text or sketch)
-7. [ ] Record 30-sec demo idea (e.g., “Robot falls in love”)
+3. [ ] Create Supabase project
+4. [ ] Get API keys: OpenRouter, Pika, Json2Video, Stripe (test), Clerk
+5. [ ] Describe UI vision (text or sketch)
+6. [ ] Record 30-sec demo idea (e.g., "Robot falls in love")
+7. [ ] Update projectLogs.md after each session
 
 ---
 
 # My To-Do List (All Coding)
 
-1. [ ] Generate full repo skeleton
-2. [ ] Build workflow engine from n8n logic
-3. [ ] Connect all APIs
-4. [ ] Build UI components
-5. [ ] Add auth + billing
-6. [ ] Deploy + monitor
+1. [x] Generate full repo skeleton
+2. [x] Build custom workflow engine (no n8n)
+3. [x] Connect OpenRouter API
+4. [ ] Complete Pika & Json2Video API integration
+5. [x] Build core UI components
+6. [ ] Add auth + billing
+7. [ ] Deploy + monitor
 
 ---
 
-# Timeline to MVP (15 Days)
+# Current Status & Timeline
 
-| Week | Milestone |
-|------|---------|
-| **Week 1** | Workflow engine + API working |
-| **Week 2** | UI + Auth + Credits |
-| **Week 3** | Deploy + Launch MVP |
+**Current Phase**: Week 2 - API Integration & Testing
+- ✅ Week 1: Architecture, custom workflow engine, OpenRouter integration
+- 🔄 Week 2: Complete Pika/Json2Video integration, UI polish, testing
+- ⏳ Week 3: Auth, billing, deployment
+
+**Blocker**: Waiting on Pika API key approval for full end-to-end testing
 
 ---
 
-## Ready to Start?
+## Current Status & Next Steps
 
-**Your next step**:  
-> **Create the GitHub repo and start a VS Code Live Share session. Paste the n8n JSON export. Then say: “Grok, generate the repo structure and first file.”**
+**We're actively building!** 🚀
 
-I’ll generate the **entire initial codebase in one message** — you just paste it in.
+**Completed**: Repository setup, custom workflow engine, OpenRouter integration, core UI components
+**Next Priority**: Obtain Pika API key → Complete full workflow testing → Polish UI
 
-Let’s build the future of filmmaking — **together**.
+**Daily Workflow**:
+- Update `projectLogs.md` after each session
+- Test progress in browser
+- Fix bugs and iterate
+
+**Collaboration**: Let's continue building the future of AI filmmaking — **together**!
