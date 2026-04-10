@@ -26,6 +26,7 @@ export interface Scene {
   description: string
   dialogue?: string
   visual_prompt: string
+  audio_prompt?: string
   duration: number
 }
 
@@ -199,6 +200,8 @@ Format as a JSON array of scenes.
       
       try {
         const videoPath = path.join(buildDir, `scene_${i}.mp4`)
+        const falAiKey = process.env.FALAI_API_KEY
+        const LOCAL_SIDECAR_URL = 'http://localhost:8081/generate-video' // Fallback sidecar link
 
         // Attempt 1: Local LTX-2.3 Engine (The "Free & Real Hollywood" Method)
         try {
@@ -238,8 +241,8 @@ Format as a JSON array of scenes.
         const imagePath = path.join(buildDir, `ref_${i}.jpg`)
         await fs.writeFile(imagePath, Buffer.from(imageBuffer))
 
+        // 2. Cinematic Neural Fallback
         let finalVideoUrl: string | null = null
-        const videoPath = path.join(buildDir, `scene_${i}.mp4`)
 
         // Attempt 1: Local Sidecar (True Local Movie)
         try {
