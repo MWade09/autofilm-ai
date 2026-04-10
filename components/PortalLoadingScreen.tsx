@@ -310,7 +310,7 @@ export function PortalLoadingScreen({ isVisible, progress = 0, status = "Generat
             className="mt-12 text-center"
           >
             <p className="text-gray-500 text-sm mb-2">Hold on tight!</p>
-            <p className="text-gray-400 text-xs">Your film is being crafted in another dimension</p>
+            <p className="text-gray-400 text-xs">Your film is being crafted in another galaxy</p>
           </motion.div>
         </motion.div>
       </div>

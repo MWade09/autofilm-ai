@@ -1,98 +1,96 @@
+'use client'
+
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/nextjs'
 import { SpaceBackground } from '@/components/SpaceBackground'
+import { motion } from 'framer-motion'
 
 export default function Home() {
   return (
-    <div className="min-h-screen relative">
+    <div className="min-h-screen relative overflow-hidden flex flex-col justify-center pt-32">
       <SpaceBackground />
+      
+      {/* Immersive Overlay */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-black/40 to-black/90 pointer-events-none z-0"></div>
+
       <div className="relative z-10 container mx-auto px-4 py-16">
-        {/* Header */}
-        <header className="text-center mb-16">
-          <div className="mb-6">
-            <h1 className="text-7xl md:text-8xl font-bold bg-gradient-to-r from-purple-400 via-blue-400 to-purple-600 bg-clip-text text-transparent mb-4 animate-pulse">
-              AutoFilm AI
+        {/* Cinematic Header Section */}
+        <header className="text-center mb-24 max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.2 }}
+            className="mb-8"
+          >
+            <h1 className="text-6xl md:text-8xl lg:text-9xl font-extrabold tracking-tighter mb-6 relative">
+              <span className="text-transparent bg-clip-text bg-gradient-to-br from-white via-blue-100 to-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]">
+                Dream
+              </span>
+              <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-blue-500 drop-shadow-[0_0_25px_rgba(168,85,247,0.5)]">
+                In Motion.
+              </span>
             </h1>
-            <div className="w-32 h-1 bg-gradient-to-r from-purple-500 to-blue-500 mx-auto rounded-full"></div>
-          </div>
-          <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Turn any story idea into a Hollywood-style short film in under 10 minutes.
-            <span className="text-purple-400 font-semibold"> Powered by AI, built for creators.</span>
-          </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <SignedOut>
-              <SignInButton mode="modal">
-                <Button size="lg" className="text-lg px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 shadow-lg shadow-purple-500/25">
-                  Get Started
-                </Button>
-              </SignInButton>
-            </SignedOut>
-            <SignedIn>
-              <Link href="/dashboard">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-3 border-purple-500/50 text-white hover:bg-purple-500/10 hover:border-purple-400 shadow-lg">
-                  Go to Dashboard
-                </Button>
-              </Link>
-            </SignedIn>
-          </div>
+            <motion.div 
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 1, delay: 0.8, ease: "circOut" }}
+              className="w-48 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 mx-auto rounded-full shadow-[0_0_20px_rgba(236,72,153,0.8)]"
+            ></motion.div>
+          </motion.div>
+          
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1, delay: 0.8 }}
+            className="text-xl md:text-3xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed font-light"
+          >
+            Turn any story idea into a Hollywood-style short film in under 10 minutes. 
+            <br className="hidden md:block"/>
+            <span className="text-white font-medium drop-shadow-md"> Powered by AI, designed for visionaries.</span>
+          </motion.p>
+          
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.2 }}
+            className="flex gap-6 justify-center flex-wrap"
+          >
+            <Link href="/dashboard">
+              <Button size="lg" className="text-xl px-10 py-8 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white border-0 rounded-full shadow-[0_0_30px_rgba(236,72,153,0.4)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_50px_rgba(236,72,153,0.6)] group">
+                Enter The Portal 
+                <span className="ml-3 group-hover:translate-x-2 transition-transform duration-300 inline-block">→</span>
+              </Button>
+            </Link>
+          </motion.div>
         </header>
 
-        {/* Features */}
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
-          <div className="backdrop-blur-sm bg-black/20 border border-purple-500/20 p-8 rounded-xl shadow-xl hover:bg-black/30 transition-all duration-300">
-            <div className="text-4xl mb-4">⚡</div>
-            <h3 className="text-2xl font-semibold mb-4 text-white">
-              Instant Generation
-            </h3>
-            <p className="text-gray-300 leading-relaxed">
-              Enter your story idea and watch as AI creates a complete short film with scenes, dialogue, and visuals in minutes.
-            </p>
-          </div>
-          <div className="backdrop-blur-sm bg-black/20 border border-blue-500/20 p-8 rounded-xl shadow-xl hover:bg-black/30 transition-all duration-300">
-            <div className="text-4xl mb-4">🎬</div>
-            <h3 className="text-2xl font-semibold mb-4 text-white">
-              Professional Quality
-            </h3>
-            <p className="text-gray-300 leading-relaxed">
-              Hollywood-style production with multiple scenes, character development, and cinematic effects.
-            </p>
-          </div>
-          <div className="backdrop-blur-sm bg-black/20 border border-purple-500/20 p-8 rounded-xl shadow-xl hover:bg-black/30 transition-all duration-300">
-            <div className="text-4xl mb-4">📱</div>
-            <h3 className="text-2xl font-semibold mb-4 text-white">
-              Easy Sharing
-            </h3>
-            <p className="text-gray-300 leading-relaxed">
-              Download your film or share it directly with a link. Perfect for social media and presentations.
-            </p>
-          </div>
-        </div>
+        {/* Feature Cards Showcase */}
+        <div className="grid md:grid-cols-3 gap-8 mb-10 max-w-6xl mx-auto relative">
+          {/* Grid Background Glow */}
+          <div className="absolute inset-0 bg-purple-500/5 blur-[100px] -z-10 rounded-full pointer-events-none"></div>
 
-        {/* CTA */}
-        <div className="text-center">
-          <div className="backdrop-blur-sm bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-2xl p-8 max-w-2xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Ready to Create Your Film?
-            </h2>
-            <p className="text-gray-300 mb-6 text-lg">
-              Join creators worldwide who are turning their stories into cinematic masterpieces.
-            </p>
-            <SignedOut>
-              <SignUpButton mode="modal">
-                <Button size="lg" className="text-xl px-12 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 shadow-lg shadow-purple-500/25 transform hover:scale-105 transition-all duration-200">
-                  🚀 Start Creating Films Today
-                </Button>
-              </SignUpButton>
-            </SignedOut>
-            <SignedIn>
-              <Link href="/dashboard">
-                <Button size="lg" variant="outline" className="text-xl px-12 py-4 border-purple-500/50 text-white hover:bg-purple-500/10 hover:border-purple-400 shadow-lg transform hover:scale-105 transition-all duration-200">
-                  🎬 Create Your First Film
-                </Button>
-              </Link>
-            </SignedIn>
-          </div>
+          {[
+            { icon: "⚡", title: "Lightning Fast", desc: "No more waiting weeks for rendering. From prompt to final cut in under 10 minutes.", delay: 1.4 },
+            { icon: "🎬", title: "Cinematic Quality", desc: "Multiple camera angles, dramatic lighting, and cohesive character persistence.", delay: 1.6 },
+            { icon: "🌐", title: "Scale Your Influence", desc: "Download in 4K or share instantly via unique links to your audience.", delay: 1.8 }
+          ].map((feature, idx) => (
+            <motion.div 
+              key={idx}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: feature.delay }}
+              className="backdrop-blur-xl bg-black/40 border border-white/5 p-10 rounded-3xl shadow-2xl hover:bg-white/[0.03] hover:border-white/10 transition-all duration-500 group"
+            >
+              <div className="text-5xl mb-6 transform group-hover:scale-110 transition-transform duration-500 origin-left">{feature.icon}</div>
+              <h3 className="text-2xl font-bold mb-4 text-white tracking-tight">
+                {feature.title}
+              </h3>
+              <p className="text-gray-400 font-light leading-relaxed text-lg group-hover:text-gray-300 transition-colors duration-300">
+                {feature.desc}
+              </p>
+            </motion.div>
+          ))}
         </div>
       </div>
     </div>

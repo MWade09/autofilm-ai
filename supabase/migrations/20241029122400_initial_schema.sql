@@ -1,93 +1,104 @@
--- Enable RLS
-ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+-- 1. DROP EXISTING TO START FRESH
+-- dropping with CASCADE automatically removes triggers and dependencies
+DROP TABLE IF EXISTS public.user_credits CASCADE;
+DROP TABLE IF EXISTS public.projects CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
 
--- Drop tables if they exist
-DROP TABLE IF EXISTS user_credits CASCADE;
-DROP TABLE IF EXISTS projects CASCADE;
+-- drop functions separately
+DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP FUNCTION IF EXISTS public.get_clerk_uid() CASCADE;
 
--- Create projects table
-CREATE TABLE projects (
+-- 2. CREATE PROFILES TABLE
+-- This links to the internal auth.users table
+CREATE TABLE public.profiles (
+  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+  email TEXT,
+  full_name TEXT,
+  avatar_url TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 3. CREATE PROJECTS TABLE
+CREATE TABLE public.projects (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
   idea TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'generating', 'rendering', 'completed', 'failed')),
   progress INTEGER NOT NULL DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
   video_url TEXT,
   error_log TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create user_credits table
-CREATE TABLE user_credits (
+-- 4. CREATE USER_CREDITS TABLE
+CREATE TABLE public.user_credits (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id TEXT NOT NULL UNIQUE,
+  user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL UNIQUE,
   credits INTEGER NOT NULL DEFAULT 3,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create Clerk user ID function in public schema
-CREATE OR REPLACE FUNCTION public.get_clerk_uid()
-RETURNS TEXT
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-AS $$
-DECLARE
-  user_id TEXT;
-BEGIN
-  -- Extract user ID from JWT claims
-  user_id := (current_setting('request.jwt.claims', true)::json)->>'sub';
-  RETURN COALESCE(user_id, '');
-END;
-$$;
+-- 5. ENABLE ROW LEVEL SECURITY
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_credits ENABLE ROW LEVEL SECURITY;
 
--- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION public.get_clerk_uid() TO authenticated;
+-- 6. RLS POLICIES (Using auth.uid())
 
--- Enable RLS
-ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_credits ENABLE ROW LEVEL SECURITY;
+-- Profiles: Users can only see and edit their own profile
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
--- Create policies for projects using Clerk user ID
-CREATE POLICY "Users can view their own projects" ON projects
-  FOR SELECT USING (public.get_clerk_uid() = user_id);
+-- Projects: Users can only see and manage their own projects
+CREATE POLICY "Users can view own projects" ON public.projects FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create own projects" ON public.projects FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own projects" ON public.projects FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own projects" ON public.projects FOR DELETE USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can create their own projects" ON projects
-  FOR INSERT WITH CHECK (public.get_clerk_uid() = user_id);
+-- Credits: Users can only view their own credits
+CREATE POLICY "Users can view own credits" ON public.user_credits FOR SELECT USING (auth.uid() = user_id);
+-- Note: Updates to credits should ideally be done via a secure backend/function, 
+-- but for now we grant access for simplicity in development.
+CREATE POLICY "Users can update own credits" ON public.user_credits FOR UPDATE USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can update their own projects" ON projects
-  FOR UPDATE USING (public.get_clerk_uid() = user_id);
-
--- Create policies for user_credits using Clerk user ID
-CREATE POLICY "Users can view their own credits" ON user_credits
-  FOR SELECT USING (public.get_clerk_uid() = user_id);
-
-CREATE POLICY "Users can update their own credits" ON user_credits
-  FOR UPDATE USING (public.get_clerk_uid() = user_id);
-
-CREATE POLICY "Users can insert their own credits" ON user_credits
-  FOR INSERT WITH CHECK (public.get_clerk_uid() = user_id);
-
--- Create function to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+-- 7. AUTOMATION: UPDATE UPDATED_AT TIMESTAMP
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = TIMEZONE('utc'::text, NOW());
+  NEW.updated_at = timezone('utc'::text, now());
   RETURN NEW;
 END;
 $$ language 'plpgsql';
 
--- Create triggers for updated_at
-CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON public.projects FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_user_credits_updated_at BEFORE UPDATE ON public.user_credits FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-CREATE TRIGGER update_user_credits_updated_at BEFORE UPDATE ON user_credits
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- 8. AUTOMATION: CREATE PROFILE & CREDITS ON SIGNUP
+-- This function automatically creates a profile and grants 3 free credits when a user signs up.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email)
+  VALUES (new.id, new.email);
 
--- Create indexes
-CREATE INDEX projects_user_id_idx ON projects(user_id);
-CREATE INDEX projects_status_idx ON projects(status);
-CREATE INDEX projects_created_at_idx ON projects(created_at DESC);
+  INSERT INTO public.user_credits (user_id, credits)
+  VALUES (new.id, 3);
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger the function every time a user is created in auth.users
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 9. INDEXES FOR PERFORMANCE
+CREATE INDEX projects_user_id_idx ON public.projects(user_id);
+CREATE INDEX projects_status_idx ON public.projects(status);
+CREATE INDEX projects_created_at_idx ON public.projects(created_at DESC);

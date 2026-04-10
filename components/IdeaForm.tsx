@@ -8,8 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, Sparkles, Zap } from 'lucide-react'
 import { ScenePortalTransition } from './ScenePortalTransition'
 import { PortalLoadingScreen } from './PortalLoadingScreen'
+import { useAuth } from './AuthProvider'
 
-export function IdeaForm() {
+interface IdeaFormProps {
+  onRefresh?: () => void
+}
+
+export function IdeaForm({ onRefresh }: IdeaFormProps) {
+  const { userId } = useAuth()
   const [idea, setIdea] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isPortalActive, setIsPortalActive] = useState(false)
@@ -34,78 +40,78 @@ export function IdeaForm() {
     if (!idea.trim()) return
 
     // Start portal animation sequence
+    setIsGenerating(true)
     setIsPortalActive(true)
     setPortalText(idea)
     setGenerationProgress(0)
     setGenerationStatus('Initializing...')
 
-    // Animate text being sucked into portal
-    setTimeout(() => {
-      setGenerationStatus('Analyzing your story...')
-      setGenerationProgress(10)
-    }, 1000)
+    try {
+        setGenerationStatus('Analyzing your story with AI...')
+        setGenerationProgress(20)
 
-    setTimeout(() => {
-      setGenerationStatus('Connecting to AI...')
-      setGenerationProgress(20)
-    }, 1500)
+        // Step 1: Draft the scenes first
+        const res = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idea, action: 'draft', userId })
+        })
 
-    // Simulate scene generation (since we don't have Pika API yet)
-    setTimeout(() => {
-      setGenerationStatus('Generating scenes...')
-      setGenerationProgress(30)
-
-      // Mock scenes data
-      const mockScenes = [
-        {
-          id: "scene_1",
-          description: "A mysterious figure emerges from the shadows",
-          dialogue: "What brings you to this forsaken place?",
-          visual_prompt: "Dark alleyway at night, mysterious hooded figure in flowing cloak, dramatic lighting from a single street lamp, rain-slicked pavement reflecting neon signs",
-          duration: 5
-        },
-        {
-          id: "scene_2",
-          description: "The chase begins through the city streets",
-          visual_prompt: "Fast-paced action sequence, figure running through crowded urban streets, pursuing shadows in the background, dynamic camera movement",
-          duration: 5
-        },
-        {
-          id: "scene_3",
-          description: "Revelation in the abandoned warehouse",
-          dialogue: "I never thought it would end like this...",
-          visual_prompt: "Dimly lit warehouse interior, dramatic confrontation, particles of dust in the air, shafts of light breaking through broken windows",
-          duration: 5
+        if (!res.ok) {
+            const errorData = await res.json()
+            throw new Error(errorData.error || 'Failed to draft scenes')
         }
-      ]
 
-      setGeneratedScenes(mockScenes)
-      setGenerationProgress(50)
-      setGenerationStatus('Scenes generated!')
+        const data = await res.json()
+        setGeneratedScenes(data.scenes)
+        setGenerationProgress(50)
+        setGenerationStatus('Script drafted! Opening portal...')
 
-      // Transition to scene display
-      setTimeout(() => {
+        // Transition to scene display
+        setTimeout(() => {
+            setIsPortalActive(false)
+            setPortalText('')
+            setShowSceneTransition(true)
+        }, 1500)
+        
+    } catch (error) {
+        console.error('Generation failed:', error)
+        alert('Failed to generate film: ' + (error instanceof Error ? error.message : String(error)))
+        setIsGenerating(false)
         setIsPortalActive(false)
-        setPortalText('')
-        setShowSceneTransition(true)
-      }, 2000)
-
-    }, 3000)
+    }
   }
 
-  const handleSceneTransitionComplete = () => {
+  const handleSceneTransitionComplete = async (finalScenes: Scene[]) => {
+    setGeneratedScenes(finalScenes) // Sync the edited scenes back
     setShowSceneTransition(false)
     setShowLoadingScreen(true)
     setGenerationProgress(60)
-    setGenerationStatus('Generating video clips...')
+    setGenerationStatus('Entering the production portal...')
 
-    // Simulate the rest of the workflow
+    // Step 2: Trigger the actual video generation in the background with FINAL scenes
+    try {
+        fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                idea, 
+                action: 'start',
+                scenes: finalScenes,
+                userId
+            })
+        })
+    } catch (err) {
+        console.error('Failed to start production:', err)
+    }
+
+    // Simulate the UI progress of the rendering phase while the real backend renders it.
     const simulateProgress = () => {
       const steps = [
-        { progress: 70, status: 'Combining scenes...', delay: 2000 },
-        { progress: 85, status: 'Finalizing video...', delay: 3000 },
-        { progress: 95, status: 'Almost done...', delay: 2000 },
-        { progress: 100, status: 'Complete!', delay: 1000 },
+        { progress: 70, status: 'Materializing cinematic frames...', delay: 4000 },
+        { progress: 85, status: 'Stitching time and space with FFmpeg...', delay: 5000 },
+        { progress: 95, status: 'Finalizing in another galaxy...', delay: 4000 },
+        { progress: 100, status: 'Portal closing! Film complete.', delay: 2000 },
       ]
 
       let currentStep = 0
@@ -126,7 +132,8 @@ export function IdeaForm() {
             setIsGenerating(false)
             setGenerationProgress(0)
             setGenerationStatus('')
-            alert('Film generation complete! (Mock workflow finished)')
+            if (onRefresh) onRefresh()
+            alert('Backend generation initiated successfully! Check dashboard shortly once processing is complete.')
           }, 2000)
         }
       }
@@ -137,11 +144,14 @@ export function IdeaForm() {
     simulateProgress()
   }
 
+  const [style, setStyle] = useState('Cinematic')
+  const [mood, setMood] = useState('Epic')
+
   return (
     <div className="relative">
       {/* Scene Transition Screen */}
       <ScenePortalTransition
-        scenes={generatedScenes}
+        initialScenes={generatedScenes}
         isVisible={showSceneTransition}
         onComplete={handleSceneTransitionComplete}
       />
@@ -206,86 +216,99 @@ export function IdeaForm() {
       <motion.div
         animate={isPortalActive ? {
           scale: [1, 1.02, 1],
-          boxShadow: [
-            "0 0 0 rgba(147, 51, 234, 0)",
-            "0 0 30px rgba(147, 51, 234, 0.5)",
-            "0 0 0 rgba(147, 51, 234, 0)"
-          ]
         } : {}}
         transition={{ duration: 1, repeat: isPortalActive ? Infinity : 0 }}
       >
-        <Card className="backdrop-blur-sm bg-black/20 border-purple-500/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
-              <motion.div
-                animate={isPortalActive ? { rotate: 360 } : {}}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              >
-                <Sparkles className="h-5 w-5 text-purple-400" />
-              </motion.div>
-              Create Your Film
-            </CardTitle>
-            <CardDescription className="text-gray-300">
-              Enter a story idea and watch AI create a Hollywood-style short film in minutes.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <Card className="backdrop-blur-2xl bg-black/40 border-white/5 shadow-2xl overflow-hidden rounded-3xl group">
+          <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 via-transparent to-blue-500/10 opacity-50" />
+          
+          <CardHeader className="relative z-10 pb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30">
+                 <Sparkles className="h-5 w-5 text-purple-400" />
+              </div>
               <div>
-                <motion.div
-                  animate={isPortalActive ? {
-                    scale: [1, 1.05, 1],
-                    borderColor: ["rgba(147, 51, 234, 0.2)", "rgba(147, 51, 234, 0.8)", "rgba(147, 51, 234, 0.2)"]
-                  } : {}}
-                  transition={{ duration: 1, repeat: isPortalActive ? Infinity : 0 }}
-                >
+                <CardTitle className="text-2xl font-black italic tracking-tighter text-white">COMMAND CENTER</CardTitle>
+                <CardDescription className="text-gray-500 text-[10px] uppercase font-bold tracking-[0.2em]">Neural Link Protocol 1.0</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="relative z-10 space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div className="relative group">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition duration-500" />
                   <Textarea
-                    placeholder="e.g., A robot falls in love with a human in a futuristic city..."
+                    placeholder="Enter your narrative sequence... (e.g. A cybernetic detective uncovers a secret in a rainy neon city)"
                     value={idea}
                     onChange={(e) => setIdea(e.target.value)}
-                    rows={6}
-                    className="resize-none bg-black/30 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-purple-400/20"
-                    disabled={isGenerating || isPortalActive}
+                    className="relative w-full h-48 bg-black/60 border-white/5 text-white placeholder:text-gray-600 focus:border-purple-500/50 focus:ring-purple-500/10 rounded-2xl p-6 text-lg font-light resize-none leading-relaxed transition-all"
                   />
-                </motion.div>
-                <p className="text-sm text-gray-400 mt-2">
-                  {idea.length}/500 characters
-                </p>
+                </div>
+
+                {/* Narrative Controls */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Visual Style</label>
+                    <select 
+                      value={style}
+                      onChange={(e) => setStyle(e.target.value)}
+                      className="w-full bg-white/5 border border-white/5 rounded-xl h-12 px-4 text-sm text-gray-300 focus:outline-none focus:border-purple-500/50 transition-all font-bold"
+                    >
+                      <option className="bg-[#0a0a0a]">Cinematic Noir</option>
+                      <option className="bg-[#0a0a0a]">Cyberpunk Edge</option>
+                      <option className="bg-[#0a0a0a]">Ghibli Dream</option>
+                      <option className="bg-[#0a0a0a]">IMAX Documentary</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Narrative Mood</label>
+                    <select 
+                      value={mood}
+                      onChange={(e) => setMood(e.target.value)}
+                      className="w-full bg-white/5 border border-white/5 rounded-xl h-12 px-4 text-sm text-gray-300 focus:outline-none focus:border-purple-500/50 transition-all font-bold"
+                    >
+                      <option className="bg-[#0a0a0a]">Epic & Grand</option>
+                      <option className="bg-[#0a0a0a]">Dark & Gritty</option>
+                      <option className="bg-[#0a0a0a]">Whimsical</option>
+                      <option className="bg-[#0a0a0a]">Ethereal</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              <motion.div
-                whileHover={!isGenerating && !isPortalActive ? { scale: 1.02 } : {}}
-                whileTap={!isGenerating && !isPortalActive ? { scale: 0.98 } : {}}
-              >
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0"
-                  disabled={!idea.trim() || idea.length > 500 || isGenerating || isPortalActive}
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button 
+                  type="submit" 
+                  disabled={isGenerating || !idea.trim()}
+                  className="w-full h-16 text-lg font-black italic tracking-tighter uppercase bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-500 hover:via-pink-500 hover:to-blue-500 text-white border-0 rounded-2xl shadow-[0_0_40px_rgba(168,85,247,0.3)] group overflow-hidden"
                 >
-                  {isPortalActive ? (
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 0.5, repeat: Infinity }}
-                      className="flex items-center"
-                    >
-                      <Zap className="mr-2 h-4 w-4" />
-                      Sending to Portal...
-                    </motion.div>
-                  ) : isGenerating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating Film...
-                    </>
+                  {isGenerating ? (
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      Neural Synthesis...
+                    </div>
                   ) : (
                     <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Generate Film
+                      Initialize Sequence
+                      <Zap className="ml-3 h-5 w-5 group-hover:scale-125 transition-transform" />
                     </>
                   )}
+                  
+                  {/* Subtle shimmer effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                 </Button>
               </motion.div>
             </form>
           </CardContent>
+          
+          <div className="px-6 py-4 bg-white/5 border-t border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Neural GPU Ready</span>
+            </div>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">Est. Render: 8m</span>
+          </div>
         </Card>
       </motion.div>
     </div>

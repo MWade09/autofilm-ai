@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
 import { WorkflowEngine } from '@/lib/workflow/engine'
 import { z } from 'zod'
 
@@ -9,30 +8,30 @@ const generateSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
     const body = await request.json()
-    const { idea } = generateSchema.parse(body)
+    const { idea, action, scenes, projectId: existingProjectId, userId: bodyUserId } = body
+    const userId = bodyUserId || '00000000-0000-0000-0000-000000000000'
 
     // Create workflow engine
     const engine = new WorkflowEngine()
 
-    // Create project in database
-    const projectId = await engine.createProject(userId, idea)
+    if (action === 'draft') {
+      const generatedScenes = await engine.generateScenes(idea)
+      return NextResponse.json({
+        success: true,
+        scenes: generatedScenes,
+        message: 'Scenes drafted successfully!'
+      })
+    }
+
+    // Default to 'start' or traditional behavior
+    // Create project in database if not provided
+    const projectId = existingProjectId || await engine.createProject(userId, idea)
 
     // Start async film generation
-    // In production, you'd want to use a job queue like Bull or similar
-    // For now, we'll run it synchronously (not recommended for production)
     setImmediate(async () => {
       try {
-        await engine.generateFilm(projectId)
+        await engine.generateFilm(projectId, scenes)
       } catch (error) {
         console.error('Background film generation failed:', error)
       }

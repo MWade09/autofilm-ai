@@ -1,16 +1,11 @@
 import React from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import {
-  ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { CreditsDisplay } from "@/components/CreditsDisplay";
+import { AuthProvider } from "@/components/AuthProvider";
+import { AuthButton } from "@/components/AuthButton";
+import { FloatingParticles } from "@/components/FloatingParticles";
 import "./globals.css";
 
 const inter = Inter({ subsets: ['latin'] })
@@ -26,33 +21,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className={inter.className}>
-          <header className="bg-white dark:bg-gray-800 shadow-sm border-b">
-            <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                AutoFilm AI
+    <html lang="en">
+      <body className={inter.className}>
+        <FloatingParticles />
+        <AuthProvider>
+          <header className="fixed top-0 left-0 right-0 z-50 bg-black/30 backdrop-blur-md border-b border-white/10">
+            <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+              <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400 flex items-center gap-2">
+                <span className="text-3xl hidden md:inline">🎬</span> AutoFilm AI
               </h1>
               <div className="flex gap-4 items-center">
-                <SignedOut>
-                  <SignInButton mode="modal">
-                    <Button variant="outline">Sign In</Button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
-                    <Button>Sign Up</Button>
-                  </SignUpButton>
-                </SignedOut>
-                <SignedIn>
-                  <CreditsDisplay />
-                  <UserButton afterSignOutUrl="/" />
-                </SignedIn>
+                <CreditsDisplay />
+                <AuthButton />
               </div>
             </div>
           </header>
           {children}
-        </body>
-      </html>
-    </ClerkProvider>
+        </AuthProvider>
+      </body>
+    </html>
   );
 }

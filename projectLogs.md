@@ -28,13 +28,12 @@
 - **API Routes**: `/api/generate` route implemented
 
 ### 🔄 In Progress
-- Full end-to-end testing (blocked by Pika API key)
 - UI refinement and polishing
 - Error handling and logging
 
-### ❌ Blockers
-- **Pika API Key**: Currently waiting on approval/access
-- Cannot run complete workflow without Pika integration
+### ✅ Recent Breakthroughs
+- Completely removed `json2video` API dependencies.
+- Integrated `fluent-ffmpeg` and `@ffmpeg-installer/ffmpeg` to locally download placeholder clips, stitch them into a final mp4, and read the buffer directly into Supabase Storage. The entire dev pipeline is 100% free and local.
 
 ---
 
@@ -96,13 +95,8 @@
    - Solution: Proper API key configuration and request formatting
 
 ### Open Issues
-1. **Pika API Access**: Waiting on API key approval
-   - Impact: Cannot test complete video generation pipeline
-   - Next Action: Contact Pika support, explore alternatives
-
-2. **Full Workflow Testing**: Blocked by Pika API
-   - Status: Json2Video integration complete, but need scene videos to combine
-   - Next Action: Obtain Pika API key for complete testing
+1. **Json2Video Transition Processing**: Need to ensure the stitched videos correctly process transitions between placeholder clips.
+2. **Local Workflows**: Need to finalize testing the end-to-end flow with the newly mocked user and video elements to ensure full stability.
 
 ---
 
