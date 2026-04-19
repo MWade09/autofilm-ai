@@ -9,14 +9,14 @@ const generateSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { idea, action, scenes, projectId: existingProjectId, userId: bodyUserId } = body
+    const { idea, action, scenes, projectId: existingProjectId, userId: bodyUserId, style, mood } = body
     const userId = bodyUserId || '00000000-0000-0000-0000-000000000000'
 
     // Create workflow engine
     const engine = new WorkflowEngine()
 
     if (action === 'draft') {
-      const generatedScenes = await engine.generateScenes(idea)
+      const generatedScenes = await engine.generateScenes(idea, style, mood)
       return NextResponse.json({
         success: true,
         scenes: generatedScenes,

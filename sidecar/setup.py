@@ -5,8 +5,9 @@ import sys
 def install_deps():
     print("[SETUP] Installing local neural dependencies...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", 
-        "fastapi", "uvicorn", "pydantic", "torch", "diffusers", 
-        "transformers", "accelerate", "huggingface_hub", "sentencepiece"
+        "fastapi", "uvicorn", "pydantic", "torch", "torchvision",
+        "diffusers>=0.30.0", "transformers", "accelerate",
+        "huggingface_hub", "sentencepiece", "imageio[ffmpeg]", "Pillow"
     ])
 
 def download_weights():

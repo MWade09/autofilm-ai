@@ -17,9 +17,9 @@ export function CreditsDisplay() {
     const fetchCredits = async () => {
       try {
         const { data, error } = await supabase
-          .from('profiles')
+          .from('user_credits')
           .select('credits')
-          .eq('id', userId)
+          .eq('user_id', userId)
           .single()
 
         if (error) throw error
@@ -33,14 +33,14 @@ export function CreditsDisplay() {
 
     fetchCredits()
 
-    // Subscribe to changes in profiles for real-time credit updates
+    // Subscribe to real-time credit updates
     const channel = supabase
-      .channel('profile_credits')
+      .channel('user_credits_display')
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
-        table: 'profiles', 
-        filter: `id=eq.${userId}` 
+        table: 'user_credits', 
+        filter: `user_id=eq.${userId}` 
       }, (payload) => {
         setCredits(payload.new.credits)
       })

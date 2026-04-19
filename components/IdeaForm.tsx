@@ -54,7 +54,7 @@ export function IdeaForm({ onRefresh }: IdeaFormProps) {
         const res = await fetch('/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idea, action: 'draft', userId })
+            body: JSON.stringify({ idea, action: 'draft', userId, style, mood })
         })
 
         if (!res.ok) {
@@ -98,7 +98,9 @@ export function IdeaForm({ onRefresh }: IdeaFormProps) {
                 idea, 
                 action: 'start',
                 scenes: finalScenes,
-                userId
+                userId,
+                style,
+                mood
             })
         })
     } catch (err) {

@@ -32,16 +32,16 @@ export interface Scene {
 
 export class WorkflowEngine {
   private openai: OpenAI
-  private json2VideoApiKey: string
-  private json2VideoUrl: string
+  private ollamaBaseUrl: string
+  private ltxSidecarUrl: string
 
   constructor() {
     this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1",
+      apiKey: process.env.OPENAI_API_KEY || 'no-key',
+      baseURL: process.env.OPENAI_BASE_URL || 'https://openrouter.ai/api/v1',
     })
-    this.json2VideoApiKey = process.env.JSON2VIDEO_API_KEY!
-    this.json2VideoUrl = process.env.JSON2VIDEO_API_URL || 'https://api.json2video.com'
+    this.ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
+    this.ltxSidecarUrl = process.env.LTX_SIDECAR_URL || 'http://localhost:8081'
   }
 
   async generateFilm(projectId: string, existingScenes?: Scene[]): Promise<void> {
@@ -97,49 +97,60 @@ export class WorkflowEngine {
     }
   }
 
-  public async generateScenes(idea: string): Promise<Scene[]> {
+  public async generateScenes(idea: string, style = 'Cinematic', mood = 'Epic'): Promise<Scene[]> {
     const prompt = `
 [ROLE: WORLD-CLASS SCREENWRITER]
 [MODEL: GEMMA-4-26B-MOE]
 [TASK: ARCHITECT CINEMATIC NARRATIVE]
 
 Input Idea: "${idea}"
+Visual Style: ${style}
+Narrative Mood: ${mood}
 
 Generate a 4-scene audiovisual script. For each scene, provide:
-1. Visual Prompt (LTX-2.3 optimized: textures, lighting, motion vectors)
-2. Audio Prompt (LTX-2.3 optimized: ambient soundscapes, foley, atmospheric layers)
+1. Visual Prompt (LTX-2.3 optimized: textures, lighting, motion vectors, style: ${style})
+2. Audio Prompt (LTX-2.3 optimized: ambient soundscapes, foley, atmospheric layers, mood: ${mood})
 3. Directorial Notes (Camera movement, emotional arc)
 
-Format as a JSON array of scenes.
+Respond ONLY with a valid JSON array of scene objects. Each object must have:
+- id (string, e.g. "scene_1")
+- description (string)
+- visual_prompt (string, detailed, LTX-optimized)
+- audio_prompt (string)
+- duration (number, in seconds, 3-7)
 `
 
-    // Attempt 1: Local Gemma 4 Discovery (Free & Private)
+    // Attempt 1: Local Gemma 4 via Ollama (Primary — Free & Private)
     try {
         console.log('[GEMMA-4] Awakening local narrative agent...')
-        const res = await fetch('http://localhost:11434/api/generate', {
+        const res = await fetch(`${this.ollamaBaseUrl}/api/generate`, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: 'gemma4:26b', // The new MoE standard
+                model: 'gemma4:26b',
                 prompt: prompt,
                 stream: false,
                 format: 'json'
-            })
+            }),
+            signal: AbortSignal.timeout(120000), // 2 min timeout
         })
         
         if (res.ok) {
             const data = await res.json()
             console.log('[GEMMA-4] Script materialized with multimodal precision.')
-            return JSON.parse(data.response)
+            const parsed = JSON.parse(data.response)
+            // Handle both {scenes:[...]} and [...] response shapes
+            return Array.isArray(parsed) ? parsed : (parsed.scenes ?? parsed)
         }
     } catch (err) {
-        console.log('[GEMMA-4] Local agent not found. Falling back to legacy protocols...')
+        console.log('[GEMMA-4] Local agent not found. Falling back to cloud protocols...')
     }
 
     try {
-      // Attempt 2: Cloud OpenAI Fallback
-      if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 5) {
+      // Attempt 2: OpenRouter Cloud Fallback (only if key is configured)
+      if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 10) {
         const response = await this.openai.chat.completions.create({
-          model: 'openai/gpt-oss-20b',
+          model: 'google/gemma-3-27b-it',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7,
         })
@@ -192,7 +203,7 @@ Format as a JSON array of scenes.
     const videoPaths: string[] = []
     
     // LTX-2.3 Local Sidecar (Synchronized Audio/Video Engine)
-    const LTX_ENGINE_URL = 'http://localhost:8081/generate-av'
+    const LTX_ENGINE_URL = `${this.ltxSidecarUrl}/generate-av`
 
     for (let i = 0; i < scenes.length; i++) {
       const scene = scenes[i]
@@ -200,8 +211,7 @@ Format as a JSON array of scenes.
       
       try {
         const videoPath = path.join(buildDir, `scene_${i}.mp4`)
-        const falAiKey = process.env.FALAI_API_KEY
-        const LOCAL_SIDECAR_URL = 'http://localhost:8081/generate-video' // Fallback sidecar link
+        const LOCAL_SIDECAR_URL = `${this.ltxSidecarUrl}/generate-video`
 
         // Attempt 1: Local LTX-2.3 Engine (The "Free & Real Hollywood" Method)
         try {
@@ -266,18 +276,8 @@ Format as a JSON array of scenes.
             }
         } catch (e) { /* Sidecar not running */ }
 
-        // Attempt 2: Fal.ai Cloud (Premium fallback if key exists)
-        if (falAiKey && falAiKey.length > 5 && !finalVideoUrl) {
-           console.log(`  -> [CLOUD] Moving to Fal.ai Luma engine...`)
-           // ... (Existing Fal.ai polling logic from previous turn)
-           // [Truncated for brevity in this response, assume it's there or we provide a better local fallback below]
-        }
-
-        // Attempt 3: Cinematic Neural Layer (High-End Local FFmpeg)
-        // This simulates a "real movie" by adding hand-held camera sway, 
-        // motion blur, and sophisticated temporal shifts completely for free.
-        if (!finalVideoUrl) {
-            console.log(`  -> [NEURAL LAYER] Synthesizing organic motion locally via FFmpeg...`)
+        // Attempt 2: Cinematic Neural Layer (High-End Local FFmpeg — always available)
+        console.log(`  -> [NEURAL LAYER] Synthesizing organic motion locally via FFmpeg...`)
             await new Promise<void>((resolve, reject) => {
                 ffmpeg()
                   .input(imagePath)
@@ -306,7 +306,6 @@ Format as a JSON array of scenes.
                   .save(videoPath)
             })
             videoPaths.push(videoPath)
-        }
         
         console.log(`  -> Scene ${i+1} finalized.`)
         
