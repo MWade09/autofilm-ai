@@ -35,8 +35,11 @@ export function ScenePortalTransition({ initialScenes, isVisible, onComplete }: 
     setScenes(prev => prev.filter(s => s.id !== id))
   }
 
-  const handleEdit = (id: string, newDescription: string) => {
-    setScenes(prev => prev.map(s => s.id === id ? { ...s, description: newDescription } : s))
+  const handleEdit = (id: string, changes: Partial<Pick<Scene, 'description' | 'visual_prompt' | 'duration'>>) => {
+    setScenes(prev => prev.map(s => s.id === id ? { ...s, ...changes } : s))
+  }
+
+  const handleEditCommit = (id: string) => {
     setEditingId(null)
   }
 
@@ -110,15 +113,51 @@ export function ScenePortalTransition({ initialScenes, isVisible, onComplete }: 
                       {/* Content Area */}
                       <div className="flex-1 space-y-3">
                         {editingId === scene.id ? (
-                          <div className="space-y-4">
-                            <textarea
-                              autoFocus
-                              defaultValue={scene.description}
-                              onBlur={(e) => handleEdit(scene.id, e.target.value)}
-                              className="w-full bg-black/40 border border-purple-500/30 rounded-xl p-4 text-white text-lg font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
-                            />
-                            <div className="flex justify-end gap-2">
-                              <Button size="sm" variant="ghost" className="text-purple-400" onClick={() => setEditingId(null)}>
+                          <div className="space-y-3">
+                            {/* Description */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Scene Description</label>
+                              <textarea
+                                autoFocus
+                                value={scene.description}
+                                onChange={(e) => handleEdit(scene.id, { description: e.target.value })}
+                                className="w-full bg-black/40 border border-purple-500/30 rounded-xl p-4 text-white text-base font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all resize-none"
+                                rows={2}
+                              />
+                            </div>
+
+                            {/* Visual Prompt */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Visual Prompt <span className="text-purple-500/60 normal-case font-normal tracking-normal">(LTX instructions)</span></label>
+                              <textarea
+                                value={scene.visual_prompt}
+                                onChange={(e) => handleEdit(scene.id, { visual_prompt: e.target.value })}
+                                className="w-full bg-black/40 border border-blue-500/20 rounded-xl p-4 text-blue-200/80 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
+                                rows={3}
+                              />
+                            </div>
+
+                            {/* Duration */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                                Duration &mdash; <span className="text-purple-400">{scene.duration}s</span>
+                              </label>
+                              <input
+                                type="range"
+                                min={3}
+                                max={10}
+                                step={1}
+                                value={scene.duration}
+                                onChange={(e) => handleEdit(scene.id, { duration: Number(e.target.value) })}
+                                className="w-full accent-purple-500"
+                              />
+                              <div className="flex justify-between text-[9px] text-gray-600 font-bold">
+                                <span>3s</span><span>5s</span><span>7s</span><span>10s</span>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end">
+                              <Button size="sm" variant="ghost" className="text-purple-400" onClick={() => handleEditCommit(scene.id)}>
                                 <Check className="w-4 h-4 mr-2" /> Save Moment
                               </Button>
                             </div>
@@ -133,7 +172,11 @@ export function ScenePortalTransition({ initialScenes, isVisible, onComplete }: 
                                 &ldquo;{scene.dialogue}&rdquo;
                               </p>
                             )}
-                            <div className="inline-flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-gray-500 pt-2">
+                            {/* Visual prompt preview */}
+                            <p className="text-blue-300/50 text-xs font-mono line-clamp-1">
+                              {scene.visual_prompt}
+                            </p>
+                            <div className="inline-flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-gray-500 pt-1">
                               <span className="flex items-center gap-1.5"><Play className="w-3 h-3 text-purple-600" /> {scene.duration}s Sequence</span>
                               <span className="w-1 h-1 rounded-full bg-gray-800" />
                               <span>Dynamic Lighting</span>

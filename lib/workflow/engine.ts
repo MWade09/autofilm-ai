@@ -6,8 +6,16 @@ import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
 import crypto from 'crypto'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+
+const execFileAsync = promisify(execFile)
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path)
+
+// Module-level set — tracks projectIds whose jobs are actively running in this process.
+// Prevents the same project being double-submitted within the same Node.js instance.
+const activeJobIds = new Set<string>()
 
 export interface FilmProject {
   id: string
@@ -45,6 +53,15 @@ export class WorkflowEngine {
   }
 
   async generateFilm(projectId: string, existingScenes?: Scene[]): Promise<void> {
+    // Concurrent job guard — reject if this project is already being processed
+    if (activeJobIds.has(projectId)) {
+      throw new Error(`A generation job is already running for project ${projectId}.`)
+    }
+    activeJobIds.add(projectId)
+
+    // Declare buildDir here so the finally block can always reach it
+    const buildDir = path.join(os.tmpdir(), `autofilm_${projectId}`)
+
     try {
       // Get project details
       const { data: project, error: projectError } = await supabaseAdmin
@@ -68,8 +85,6 @@ export class WorkflowEngine {
       await this.updateProjectStatus(projectId, 'generating', 30)
 
       // Setup Local Build Directory
-      const tmpDir = os.tmpdir()
-      const buildDir = path.join(tmpDir, `autofilm_${projectId}`)
       await fs.mkdir(buildDir, { recursive: true })
 
       // Step 2: Generate videos for each scene locally!
@@ -79,6 +94,9 @@ export class WorkflowEngine {
       // Step 3: Combine videos into final film locally!
       const finalVideoPath = await this.combineVideos(videoPaths, buildDir)
       await this.updateProjectStatus(projectId, 'rendering', 90)
+
+      // Ensure the storage bucket exists before attempting the upload
+      await this.ensureStorageBucket()
 
       // Step 4: Upload to Supabase Storage
       const publicUrl = await this.uploadToStorage(finalVideoPath, projectId)
@@ -94,10 +112,16 @@ export class WorkflowEngine {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       await this.updateProjectStatus(projectId, 'failed', 0, undefined, errorMessage)
       throw error
+    } finally {
+      activeJobIds.delete(projectId)
+      // Full cleanup — removes scene clips, ref images, concat list, and final video
+      await fs.rm(buildDir, { recursive: true, force: true }).catch(err =>
+        console.warn('[ENGINE] Failed to clean build directory:', err)
+      )
     }
   }
 
-  public async generateScenes(idea: string, style = 'Cinematic', mood = 'Epic'): Promise<Scene[]> {
+  public async generateScenes(idea: string, style = 'Cinematic', mood = 'Epic', sceneCount = 4): Promise<Scene[]> {
     const prompt = `
 [ROLE: WORLD-CLASS SCREENWRITER]
 [MODEL: GEMMA-4-26B-MOE]
@@ -107,7 +131,7 @@ Input Idea: "${idea}"
 Visual Style: ${style}
 Narrative Mood: ${mood}
 
-Generate a 4-scene audiovisual script. For each scene, provide:
+Generate a ${sceneCount}-scene audiovisual script. For each scene, provide:
 1. Visual Prompt (LTX-2.3 optimized: textures, lighting, motion vectors, style: ${style})
 2. Audio Prompt (LTX-2.3 optimized: ambient soundscapes, foley, atmospheric layers, mood: ${mood})
 3. Directorial Notes (Camera movement, emotional arc)
@@ -167,37 +191,22 @@ Respond ONLY with a valid JSON array of scene objects. Each object must have:
     }
 
     // Attempt 3: Procedural Script Matrix (Zero-dependency fallback)
-    return [
-      {
-        id: "scene_1",
-        description: "The Genesis",
-        visual_prompt: `Cinematic wide shot of ${idea}, LTX-2.3 motion, high fidelity`,
-        audio_prompt: `Deep cinematic bass, atmospheric wind, ${idea} ambient sounds`,
-        duration: 5
-      },
-      {
-        id: "scene_2",
-        description: "The Conflict",
-        visual_prompt: `Close up focus on ${idea}, intense temporal motion, dramatic contrast`,
-        audio_prompt: `Metallic clashing, rising orchestral tension, localized foley`,
-        duration: 5
-      },
-      {
-        id: "scene_3",
-        description: "The Core",
-        visual_prompt: `Sub-surface scattering, macro detail of ${idea}, ethereal lighting`,
-        audio_prompt: `High-frequency shimmering, whisper-like ambient layers`,
-        duration: 5
-      },
-      {
-        id: "scene_4",
-        description: "The Finale",
-        visual_prompt: `God-ray illumination over ${idea}, slow pull back, epic resolution`,
-        audio_prompt: `Grand orchestral crescendo, pure sonic clarity, resolution chords`,
-        duration: 5
-      }
+    const proceduralTemplates = [
+      { description: "The Genesis",  visual_prompt: `Cinematic wide shot of ${idea}, LTX-2.3 motion, high fidelity`,                  audio_prompt: `Deep cinematic bass, atmospheric wind, ${idea} ambient sounds` },
+      { description: "The Conflict", visual_prompt: `Close up focus on ${idea}, intense temporal motion, dramatic contrast`,           audio_prompt: `Metallic clashing, rising orchestral tension, localized foley` },
+      { description: "The Core",     visual_prompt: `Sub-surface scattering, macro detail of ${idea}, ethereal lighting`,             audio_prompt: `High-frequency shimmering, whisper-like ambient layers` },
+      { description: "The Turning",  visual_prompt: `Medium shot, ${idea}, unexpected revelation, high-contrast shadows`,             audio_prompt: `Dissonant chord stab, silence, then ambient rebuild` },
+      { description: "The Drift",    visual_prompt: `Slow tracking shot alongside ${idea}, warm bokeh, melancholic haze`,             audio_prompt: `Sparse piano notes, soft room tone, distant city sounds` },
+      { description: "The Storm",    visual_prompt: `Wide angle, ${idea}, dynamic weather, kinetic energy, cinematic grain`,          audio_prompt: `Wind howl, thunder roll, tense percussive pulse` },
+      { description: "The Quiet",    visual_prompt: `Extreme close-up of ${idea}, shallow depth of field, natural light`,            audio_prompt: `Near-silence, single sustained note, soft foley` },
+      { description: "The Finale",   visual_prompt: `God-ray illumination over ${idea}, slow pull back, epic resolution`,            audio_prompt: `Grand orchestral crescendo, pure sonic clarity, resolution chords` },
     ]
-  }
+
+    return Array.from({ length: sceneCount }, (_, i) => ({
+      id: `scene_${i + 1}`,
+      ...proceduralTemplates[i % proceduralTemplates.length],
+      duration: 5,
+    }))
 
   private async generateSceneVideos(scenes: Scene[], buildDir: string): Promise<string[]> {
     const videoPaths: string[] = []
@@ -428,9 +437,6 @@ Respond ONLY with a valid JSON array of scene objects. Each object must have:
           // Read Local File (from local FFmpeg stitching)
           const fileBuffer = await fs.readFile(videoUrlOrPath)
           videoBlob = new Blob([fileBuffer], { type: 'video/mp4' })
-          
-          // Clean up the local temp directory
-          await fs.unlink(videoUrlOrPath).catch(console.error)
       }
 
       // Create a unique filename
@@ -485,6 +491,74 @@ Respond ONLY with a valid JSON array of scene objects. Each object must have:
     if (error) {
       console.error('Failed to update project status:', error)
     }
+  }
+
+  /**
+   * Ensures the 'videos' Supabase Storage bucket exists, creating it if necessary.
+   * Called once per film generation before the first upload attempt.
+   */
+  private async ensureStorageBucket(): Promise<void> {
+    const bucketName = 'videos'
+
+    const { data: buckets, error: listError } = await supabaseAdmin.storage.listBuckets()
+    if (listError) {
+      console.warn('[ENGINE] Could not list storage buckets — proceeding anyway:', listError.message)
+      return
+    }
+
+    const exists = buckets?.some(b => b.name === bucketName)
+    if (!exists) {
+      console.log(`[ENGINE] Storage bucket '${bucketName}' not found — creating...`)
+      const { error: createError } = await supabaseAdmin.storage.createBucket(bucketName, {
+        public: true,
+        fileSizeLimit: 524288000, // 500 MB
+      })
+      if (createError) {
+        // Treat "already exists" / "Duplicate" as success (harmless race condition)
+        if (
+          !createError.message.includes('already exists') &&
+          !createError.message.includes('Duplicate')
+        ) {
+          throw new Error(`Failed to create storage bucket: ${createError.message}`)
+        }
+      } else {
+        console.log(`[ENGINE] Storage bucket '${bucketName}' created successfully.`)
+      }
+    }
+  }
+
+  /**
+   * Verifies that the bundled FFmpeg binary is present and executable.
+   * Exposed as a static method so the API route can probe it at module load time.
+   */
+  static async checkFfmpegAvailable(): Promise<{ available: boolean; version?: string; error?: string }> {
+    try {
+      const { stdout } = await execFileAsync(ffmpegInstaller.path, ['-version'])
+      const version = stdout.split('\n')[0].trim()
+      return { available: true, version }
+    } catch (err) {
+      return {
+        available: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    }
+  }
+
+  /**
+   * Returns true if the given user already has a project in a non-final state
+   * (pending / generating / rendering). Used by the API route to prevent
+   * double-submission.
+   */
+  async hasActiveJobForUser(userId: string): Promise<boolean> {
+    const { data } = await supabaseAdmin
+      .from('projects')
+      .select('id')
+      .eq('user_id', userId)
+      .in('status', ['pending', 'generating', 'rendering'])
+      .limit(1)
+      .maybeSingle()
+
+    return !!data
   }
 
   async createProject(userId: string, idea: string): Promise<string> {

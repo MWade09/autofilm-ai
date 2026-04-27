@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useEffect, useState, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
 import { motion } from 'framer-motion'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stars } from '@react-three/drei'
@@ -231,11 +232,75 @@ function AdvancedPortalScene() {
 
 interface PortalLoadingScreenProps {
   isVisible: boolean
-  progress?: number
-  status?: string
+  projectId?: string | null
+  onComplete?: (success: boolean, errorMessage?: string) => void
+  /** Fallback progress shown before DB polling kicks in */
+  initialProgress?: number
+  initialStatus?: string
 }
 
-export function PortalLoadingScreen({ isVisible, progress = 0, status = "Generating your film..." }: PortalLoadingScreenProps) {
+export function PortalLoadingScreen({
+  isVisible,
+  projectId,
+  onComplete,
+  initialProgress = 0,
+  initialStatus = 'Submitting to production pipeline...',
+}: PortalLoadingScreenProps) {
+  const [progress, setProgress] = useState(initialProgress)
+  const [status, setStatus] = useState(initialStatus)
+
+  // Sync fallback props before projectId arrives
+  useEffect(() => { setProgress(initialProgress) }, [initialProgress])
+  useEffect(() => { setStatus(initialStatus) }, [initialStatus])
+
+  // Stable reference to onComplete so the interval doesn't re-create on every render
+  const onCompleteRef = useRef(onComplete)
+  useEffect(() => { onCompleteRef.current = onComplete }, [onComplete])
+
+  useEffect(() => {
+    if (!projectId || !isVisible) return
+
+    let stopped = false
+
+    const poll = async () => {
+      if (stopped) return
+      try {
+        const { data } = await supabase
+          .from('projects')
+          .select('progress, status, error_log')
+          .eq('id', projectId)
+          .single()
+
+        if (!data || stopped) return
+
+        setProgress(data.progress ?? 0)
+
+        if (data.status === 'generating') {
+          setStatus('Neural synthesis in progress...')
+        } else if (data.status === 'rendering') {
+          setStatus('Stitching frames with FFmpeg...')
+        } else if (data.status === 'completed') {
+          stopped = true
+          setProgress(100)
+          setStatus('Portal closing! Film complete.')
+          setTimeout(() => onCompleteRef.current?.(true), 1500)
+        } else if (data.status === 'failed') {
+          stopped = true
+          onCompleteRef.current?.(false, data.error_log ?? undefined)
+        }
+      } catch {
+        // Network hiccup — keep polling
+      }
+    }
+
+    poll()
+    const interval = setInterval(poll, 3000)
+    return () => {
+      stopped = true
+      clearInterval(interval)
+    }
+  }, [projectId, isVisible])
+
   if (!isVisible) return null
 
   return (

@@ -9,6 +9,7 @@ import { Loader2, Sparkles, Zap } from 'lucide-react'
 import { ScenePortalTransition } from './ScenePortalTransition'
 import { PortalLoadingScreen } from './PortalLoadingScreen'
 import { useAuth } from './AuthProvider'
+import { toast } from 'sonner'
 
 interface IdeaFormProps {
   onRefresh?: () => void
@@ -33,6 +34,7 @@ export function IdeaForm({ onRefresh }: IdeaFormProps) {
   }
   const [generationProgress, setGenerationProgress] = useState(0)
   const [generationStatus, setGenerationStatus] = useState('')
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,7 +56,7 @@ export function IdeaForm({ onRefresh }: IdeaFormProps) {
         const res = await fetch('/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idea, action: 'draft', userId, style, mood })
+            body: JSON.stringify({ idea, action: 'draft', userId, style, mood, sceneCount })
         })
 
         if (!res.ok) {
@@ -76,78 +78,75 @@ export function IdeaForm({ onRefresh }: IdeaFormProps) {
         
     } catch (error) {
         console.error('Generation failed:', error)
-        alert('Failed to generate film: ' + (error instanceof Error ? error.message : String(error)))
+        toast.error('Failed to generate film', {
+          description: error instanceof Error ? error.message : String(error),
+        })
         setIsGenerating(false)
         setIsPortalActive(false)
     }
   }
 
   const handleSceneTransitionComplete = async (finalScenes: Scene[]) => {
-    setGeneratedScenes(finalScenes) // Sync the edited scenes back
+    setGeneratedScenes(finalScenes)
     setShowSceneTransition(false)
     setShowLoadingScreen(true)
-    setGenerationProgress(60)
-    setGenerationStatus('Entering the production portal...')
+    setGenerationProgress(0)
+    setGenerationStatus('Submitting to production pipeline...')
 
-    // Step 2: Trigger the actual video generation in the background with FINAL scenes
     try {
-        fetch('/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                idea, 
-                action: 'start',
-                scenes: finalScenes,
-                userId,
-                style,
-                mood
-            })
-        })
-    } catch (err) {
-        console.error('Failed to start production:', err)
-    }
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idea,
+          action: 'start',
+          scenes: finalScenes,
+          userId,
+          style,
+          mood,
+        }),
+      })
 
-    // Simulate the UI progress of the rendering phase while the real backend renders it.
-    const simulateProgress = () => {
-      const steps = [
-        { progress: 70, status: 'Materializing cinematic frames...', delay: 4000 },
-        { progress: 85, status: 'Stitching time and space with FFmpeg...', delay: 5000 },
-        { progress: 95, status: 'Finalizing in another galaxy...', delay: 4000 },
-        { progress: 100, status: 'Portal closing! Film complete.', delay: 2000 },
-      ]
-
-      let currentStep = 0
-
-      const nextStep = () => {
-        if (currentStep < steps.length) {
-          const step = steps[currentStep]
-          setTimeout(() => {
-            setGenerationProgress(step.progress)
-            setGenerationStatus(step.status)
-            currentStep++
-            nextStep()
-          }, step.delay)
-        } else {
-          // Complete workflow
-          setTimeout(() => {
-            setShowLoadingScreen(false)
-            setIsGenerating(false)
-            setGenerationProgress(0)
-            setGenerationStatus('')
-            if (onRefresh) onRefresh()
-            alert('Backend generation initiated successfully! Check dashboard shortly once processing is complete.')
-          }, 2000)
-        }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to start production')
       }
 
-      nextStep()
+      const data = await res.json()
+      // Hand off to PortalLoadingScreen — it will poll Supabase from here
+      setActiveProjectId(data.projectId)
+    } catch (err) {
+      console.error('Failed to start production:', err)
+      toast.error('Failed to start production', {
+        description: err instanceof Error ? err.message : String(err),
+      })
+      setShowLoadingScreen(false)
+      setIsGenerating(false)
     }
+  }
 
-    simulateProgress()
+  const handleProductionComplete = (success: boolean, errorMessage?: string) => {
+    setShowLoadingScreen(false)
+    setIsGenerating(false)
+    setActiveProjectId(null)
+    setGenerationProgress(0)
+    setGenerationStatus('')
+    if (success) {
+      toast.success('Film complete!', {
+        description: 'Your film is ready in the archive.',
+      })
+      if (onRefresh) onRefresh()
+    } else {
+      toast.error('Production failed', {
+        description: errorMessage || 'Check the archive for details.',
+      })
+      if (onRefresh) onRefresh()
+    }
   }
 
   const [style, setStyle] = useState('Cinematic')
   const [mood, setMood] = useState('Epic')
+  const [sceneCount, setSceneCount] = useState<2 | 4 | 6 | 8>(4)
 
   return (
     <div className="relative">
@@ -161,8 +160,10 @@ export function IdeaForm({ onRefresh }: IdeaFormProps) {
       {/* Loading Screen */}
       <PortalLoadingScreen
         isVisible={showLoadingScreen}
-        progress={generationProgress}
-        status={generationStatus}
+        projectId={activeProjectId}
+        onComplete={handleProductionComplete}
+        initialProgress={generationProgress}
+        initialStatus={generationStatus}
       />
 
       {/* Portal Text Animation */}
@@ -270,12 +271,34 @@ export function IdeaForm({ onRefresh }: IdeaFormProps) {
                       onChange={(e) => setMood(e.target.value)}
                       className="w-full bg-white/5 border border-white/5 rounded-xl h-12 px-4 text-sm text-gray-300 focus:outline-none focus:border-purple-500/50 transition-all font-bold"
                     >
-                      <option className="bg-[#0a0a0a]">Epic & Grand</option>
-                      <option className="bg-[#0a0a0a]">Dark & Gritty</option>
+                      <option className="bg-[#0a0a0a]">Epic &amp; Grand</option>
+                      <option className="bg-[#0a0a0a]">Dark &amp; Gritty</option>
                       <option className="bg-[#0a0a0a]">Whimsical</option>
                       <option className="bg-[#0a0a0a]">Ethereal</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Scene Count Selector */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Scene Count</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {([2, 4, 6, 8] as const).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setSceneCount(n)}
+                        className={`h-12 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                          sceneCount === n
+                            ? 'bg-purple-600 text-white shadow-[0_0_16px_rgba(168,85,247,0.4)]'
+                            : 'bg-white/5 border border-white/5 text-gray-400 hover:border-purple-500/30 hover:text-gray-200'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-600 ml-1">scenes &mdash; {sceneCount * 5}s estimated runtime</p>
                 </div>
               </div>
 

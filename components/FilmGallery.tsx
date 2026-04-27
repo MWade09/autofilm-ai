@@ -209,9 +209,15 @@ export function FilmGallery() {
                         <AlertTriangle className="h-4 w-4" />
                         <p className="font-bold text-xs uppercase tracking-widest italic">Signal Lost</p>
                       </div>
-                      <p className="text-red-200/60 text-xs leading-relaxed">
-                        The neural link could not be established. Please re-initialize sequence.
-                      </p>
+                      {project.error_log ? (
+                        <p className="text-red-200/70 text-xs font-mono leading-relaxed break-words whitespace-pre-wrap">
+                          {project.error_log}
+                        </p>
+                      ) : (
+                        <p className="text-red-200/60 text-xs leading-relaxed">
+                          The neural link could not be established. Please re-initialize sequence.
+                        </p>
+                      )}
                     </div>
                   )}
                 </CardContent>

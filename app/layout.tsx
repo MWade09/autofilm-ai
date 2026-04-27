@@ -6,6 +6,7 @@ import { CreditsDisplay } from "@/components/CreditsDisplay";
 import { AuthProvider } from "@/components/AuthProvider";
 import { AuthButton } from "@/components/AuthButton";
 import { FloatingParticles } from "@/components/FloatingParticles";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const inter = Inter({ subsets: ['latin'] })
@@ -38,6 +39,17 @@ export default function RootLayout({
           </header>
           {children}
         </AuthProvider>
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: 'rgba(10,10,10,0.95)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#fff',
+              backdropFilter: 'blur(12px)',
+            },
+          }}
+        />
       </body>
     </html>
   );

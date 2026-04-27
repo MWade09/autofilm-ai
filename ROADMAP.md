@@ -26,18 +26,18 @@ The core pipeline is functional end-to-end:
 > Goal: Every user who follows the README gets a beautiful short film on the first try, with no rough edges in the UI or the pipeline.
 
 ### 1.1 UI / UX
-- [ ] **Replace `alert()` calls** with a proper toast notification component (shadcn `Sonner` or equivalent) — currently `IdeaForm.tsx` uses `alert()` for errors and completion, which breaks immersion
-- [ ] **Real progress polling** — the loading screen currently simulates progress with hardcoded delays; it should poll `projects.progress` from Supabase every 3 seconds and reflect the actual backend state
-- [ ] **Error detail in gallery** — when a film fails, show the `error_log` from the database in the "Signal Lost" card so users know exactly what went wrong
-- [ ] **Scene count selector** — allow users to choose 2, 4, 6, or 8 scenes before drafting (currently hardcoded to 4 in the Gemma prompt)
-- [ ] **Scene duration controls** — let users set per-scene duration (3–10 seconds) in the Directorial Suite editor; currently all scenes are fixed at 5 seconds
-- [ ] **Visual prompt editing** — the Directorial Suite lets users edit `description` but not `visual_prompt`; expose the visual prompt field so power users can refine LTX instructions directly
+- [x] **Replace `alert()` calls** with a proper toast notification component (shadcn `Sonner` or equivalent) — currently `IdeaForm.tsx` uses `alert()` for errors and completion, which breaks immersion
+- [x] **Real progress polling** — the loading screen currently simulates progress with hardcoded delays; it should poll `projects.progress` from Supabase every 3 seconds and reflect the actual backend state
+- [x] **Error detail in gallery** — when a film fails, show the `error_log` from the database in the "Signal Lost" card so users know exactly what went wrong
+- [x] **Scene count selector** — allow users to choose 2, 4, 6, or 8 scenes before drafting (currently hardcoded to 4 in the Gemma prompt)
+- [x] **Scene duration controls** — let users set per-scene duration (3–10 seconds) in the Directorial Suite editor; currently all scenes are fixed at 5 seconds
+- [x] **Visual prompt editing** — the Directorial Suite lets users edit `description` but not `visual_prompt`; expose the visual prompt field so power users can refine LTX instructions directly
 
 ### 1.2 Pipeline Reliability
-- [ ] **FFmpeg PATH check on startup** — if `ffmpeg` is not found, surface a clear warning in the Next.js server log and return a helpful 503 from the API rather than a cryptic crash
-- [ ] **Temp directory cleanup** — build directories under `os.tmpdir()` are cleaned for the final video file but scene clips are not always removed; add a full `buildDir` cleanup after successful upload
-- [ ] **Supabase Storage bucket guard** — if the `videos` bucket doesn't exist, the upload fails silently; add a `getOrCreateBucket` check in the engine before the first upload attempt
-- [ ] **Concurrent generation limit** — if a user submits twice quickly, two background jobs race against the same `projectId`; add a check that rejects a new job if one is already running for that project
+- [x] **FFmpeg PATH check on startup** — if `ffmpeg` is not found, surface a clear warning in the Next.js server log and return a helpful 503 from the API rather than a cryptic crash
+- [x] **Temp directory cleanup** — build directories under `os.tmpdir()` are cleaned for the final video file but scene clips are not always removed; add a full `buildDir` cleanup after successful upload
+- [x] **Supabase Storage bucket guard** — if the `videos` bucket doesn't exist, the upload fails silently; add a `getOrCreateBucket` check in the engine before the first upload attempt
+- [x] **Concurrent generation limit** — if a user submits twice quickly, two background jobs race against the same `projectId`; add a check that rejects a new job if one is already running for that project
 
 ### 1.3 Developer Experience
 - [ ] **Docker Compose file** — `docker-compose.yml` with three services: `web` (Next.js), `sidecar` (Python FastAPI), `ollama`; lets new contributors run `docker compose up` and have everything working in minutes
